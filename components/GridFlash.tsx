@@ -11,17 +11,22 @@ type Phase = 'showing' | 'input' | 'over';
 /** Grid Flash: watch the lit cells, then tap them from memory. */
 export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) {
   const [level, setLevel] = useState(1);
-  const [round, setRound] = useState<Round>(() => startRound(1));
+  const [round, setRound] = useState<Round | null>(null);
   const [phase, setPhase] = useState<Phase>('showing');
 
+  // Random cells are picked on the client after mount, never during prerender.
   useEffect(() => {
-    if (phase !== 'showing') return;
+    setRound(startRound(1));
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'showing' || !round) return;
     const timer = setTimeout(() => setPhase('input'), flashMs);
     return () => clearTimeout(timer);
   }, [phase, round, flashMs]);
 
   function onTap(cell: number) {
-    if (phase !== 'input') return;
+    if (phase !== 'input' || !round) return;
     const result = tapCell(round, cell);
     if (result.kind === 'wrong') {
       setPhase('over');
@@ -70,8 +75,8 @@ export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) 
       >
         {Array.from({ length: CELL_COUNT }, (_, cell) => {
           const lit =
-            (phase === 'showing' && round.targets.includes(cell)) ||
-            (phase === 'input' && round.taps.includes(cell));
+            (phase === 'showing' && !!round?.targets.includes(cell)) ||
+            (phase === 'input' && !!round?.taps.includes(cell));
           return (
             <button
               key={cell}
