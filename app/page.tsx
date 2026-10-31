@@ -1,7 +1,10 @@
+import GridFlash from '@/components/GridFlash';
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <p className="text-center text-lg">This app is set up and waiting for its first feature.</p>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
+      <h1 className="text-3xl font-bold">Grid Flash</h1>
+      <GridFlash />
     </main>
   );
 }
