@@ -1,32 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { CELL_COUNT, GRID_SIZE, startRound, tapCell, type Round } from '@/lib/gridFlash';
 
 const FLASH_MS = 1200;
+const subscribe = () => () => {};
 
 type Phase = 'showing' | 'input' | 'over';
 
 /** Grid Flash: watch the lit cells, then tap them from memory. */
 export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) {
   const [level, setLevel] = useState(1);
-  const [round, setRound] = useState<Round | null>(null);
+  const [round, setRound] = useState<Round>(() => startRound(1));
   const [phase, setPhase] = useState<Phase>('showing');
+  // False during prerender and hydration, so the random cells never cause a mismatch.
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
 
-  // Random cells are picked on the client after mount, never during prerender.
   useEffect(() => {
-    setRound(startRound(1));
-  }, []);
-
-  useEffect(() => {
-    if (phase !== 'showing' || !round) return;
+    if (phase !== 'showing') return;
     const timer = setTimeout(() => setPhase('input'), flashMs);
     return () => clearTimeout(timer);
   }, [phase, round, flashMs]);
 
   function onTap(cell: number) {
-    if (phase !== 'input' || !round) return;
+    if (phase !== 'input') return;
     const result = tapCell(round, cell);
     if (result.kind === 'wrong') {
       setPhase('over');
@@ -75,8 +77,9 @@ export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) 
       >
         {Array.from({ length: CELL_COUNT }, (_, cell) => {
           const lit =
-            (phase === 'showing' && !!round?.targets.includes(cell)) ||
-            (phase === 'input' && !!round?.taps.includes(cell));
+            mounted &&
+            ((phase === 'showing' && round.targets.includes(cell)) ||
+              (phase === 'input' && round.taps.includes(cell)));
           return (
             <button
               key={cell}
