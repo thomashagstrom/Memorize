@@ -29,8 +29,26 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deploy on Firebase App Hosting
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This app goes live on Firebase App Hosting, not Vercel: once a Firebase project is
+connected, every change merged to the main branch goes online by itself. See the
+Firebase section below.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Firebase
+
+This app is wired to **Cloud Firestore** and **Firebase Authentication** and runs
+against the local emulators until a real Firebase project is connected.
+
+```bash
+npm run emulators   # Auth on :9099, Firestore on :8081, dashboard on :4000
+npm run dev         # in a second terminal
+```
+
+- `lib/firebase.ts` builds the Firebase clients. With no
+  `NEXT_PUBLIC_FIREBASE_PROJECT_ID` set it uses the emulators.
+- `firestore.rules` is the security policy. It is closed by default: each signed-in
+  person can read and write only their own `notes`. Open a new path on purpose, and
+  review every change to this file.
+- `apphosting.yaml` sets the limits for Firebase App Hosting, where this app is
+  deployed once a Firebase project is connected.
