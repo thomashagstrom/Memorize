@@ -1,25 +1,19 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 
 import { CELL_COUNT, GRID_SIZE, startRound, tapCell, type Round } from '@/lib/gridFlash';
 
 const FLASH_MS = 1200;
-const subscribe = () => () => {};
 
-type Phase = 'showing' | 'input' | 'over';
+type Phase = 'idle' | 'showing' | 'input' | 'over';
 
 /** Grid Flash: watch the lit cells, then tap them from memory. */
 export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) {
   const [level, setLevel] = useState(1);
-  const [round, setRound] = useState<Round>(() => startRound(1));
-  const [phase, setPhase] = useState<Phase>('showing');
-  // False during prerender and hydration, so the random cells never cause a mismatch.
-  const mounted = useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
+  // The first round is drawn on Play, not while rendering, so prerender and hydration agree.
+  const [round, setRound] = useState<Round>({ targets: [], taps: [] });
+  const [phase, setPhase] = useState<Phase>('idle');
 
   useEffect(() => {
     if (phase !== 'showing') return;
@@ -50,6 +44,20 @@ export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) 
   // Score is the number of rounds completed.
   const score = level - 1;
 
+  if (phase === 'idle') {
+    return (
+      <section className="flex flex-col items-center gap-4" aria-label="Grid Flash">
+        <p>Test your memory</p>
+        <button
+          className="rounded bg-blue-700 px-6 py-3 text-white hover:bg-blue-800"
+          onClick={newGame}
+        >
+          Play
+        </button>
+      </section>
+    );
+  }
+
   if (phase === 'over') {
     return (
       <section className="flex flex-col items-center gap-4" aria-label="Game over">
@@ -77,9 +85,8 @@ export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) 
       >
         {Array.from({ length: CELL_COUNT }, (_, cell) => {
           const lit =
-            mounted &&
-            ((phase === 'showing' && round.targets.includes(cell)) ||
-              (phase === 'input' && round.taps.includes(cell)));
+            (phase === 'showing' && round.targets.includes(cell)) ||
+            (phase === 'input' && round.taps.includes(cell));
           return (
             <button
               key={cell}

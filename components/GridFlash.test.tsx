@@ -7,6 +7,7 @@ const cells = () => screen.getAllByRole('button', { name: /^Cell / });
 const litIndexes = () =>
   cells().flatMap((c, i) => (c.getAttribute('data-lit') === 'true' ? [i] : []));
 const hide = () => act(() => void vi.advanceTimersByTime(5000));
+const play = () => fireEvent.click(screen.getByRole('button', { name: 'Play' }));
 
 /** Reads the lit cells, hides them, taps them all. */
 function playRoundCorrectly() {
@@ -23,8 +24,16 @@ describe('Grid Flash', () => {
     vi.useRealTimers();
   });
 
+  it('shows no cells until the player presses Play', () => {
+    render(<GridFlash />);
+    expect(screen.queryAllByRole('button', { name: /^Cell / })).toHaveLength(0);
+    play();
+    expect(cells()).toHaveLength(9);
+  });
+
   it('lights up cells, hides them, then lets the player tap', () => {
     render(<GridFlash />);
+    play();
     expect(litIndexes()).toHaveLength(2);
     expect(cells().every((c) => (c as HTMLButtonElement).disabled)).toBe(true);
     hide();
@@ -34,6 +43,7 @@ describe('Grid Flash', () => {
 
   it('adds one more lit cell after a fully correct round', () => {
     render(<GridFlash />);
+    play();
     playRoundCorrectly();
     expect(litIndexes()).toHaveLength(3);
     expect(screen.queryByText('Game over')).toBeNull();
@@ -41,6 +51,7 @@ describe('Grid Flash', () => {
 
   it('ends the game on the first wrong answer and shows the score of rounds completed', () => {
     render(<GridFlash />);
+    play();
     playRoundCorrectly();
     const lit = litIndexes();
     hide();
@@ -52,6 +63,7 @@ describe('Grid Flash', () => {
 
   it('does not end the game on a correct tap', () => {
     render(<GridFlash />);
+    play();
     const lit = litIndexes();
     hide();
     fireEvent.click(cells()[lit[0]]);
@@ -60,6 +72,7 @@ describe('Grid Flash', () => {
 
   it('starts a new game from the game over screen', () => {
     render(<GridFlash />);
+    play();
     const lit = litIndexes();
     hide();
     fireEvent.click(cells().find((_, i) => !lit.includes(i))!);
