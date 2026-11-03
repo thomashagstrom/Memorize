@@ -9,7 +9,13 @@ const FLASH_MS = 1200;
 type Phase = 'idle' | 'showing' | 'input' | 'over';
 
 /** Grid Flash: watch the lit cells, then tap them from memory. */
-export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) {
+export default function GridFlash({
+  flashMs = FLASH_MS,
+  onGameOver,
+}: {
+  flashMs?: number;
+  onGameOver?: (score: number) => void;
+}) {
   const [level, setLevel] = useState(1);
   // The first round is drawn on Play, not while rendering, so prerender and hydration agree.
   const [round, setRound] = useState<Round>({ targets: [], taps: [] });
@@ -26,6 +32,7 @@ export default function GridFlash({ flashMs = FLASH_MS }: { flashMs?: number }) 
     const result = tapCell(round, cell);
     if (result.kind === 'wrong') {
       setPhase('over');
+      onGameOver?.(level - 1);
     } else if (result.kind === 'complete') {
       setLevel(level + 1);
       setRound(startRound(level + 1));
