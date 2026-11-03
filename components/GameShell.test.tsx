@@ -74,7 +74,7 @@ describe('Sign in with Google', () => {
     render(<GameShell />);
     act(() => h.listener!(player));
     loseGame();
-    expect(h.recordScore).toHaveBeenCalledWith('u1', 0);
+    expect(h.recordScore).toHaveBeenCalledWith('u1', 0, 'Ada Lovelace');
     await vi.waitFor(() => expect(screen.getByTestId('best-score').textContent).toBe('5'));
   });
 
