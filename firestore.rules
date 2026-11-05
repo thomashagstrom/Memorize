@@ -11,14 +11,17 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid;
     }
 
-    // Each signed-in person can read their own profile and raise their own best score, never lower it.
+    // Any signed-in person can read profiles, for the leaderboard ranking, but
+    // can only raise their own best score, never lower it.
     match /profiles/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.bestScore is int;
+        && request.resource.data.bestScore is int
+        && request.resource.data.displayName is string;
       allow update: if request.auth != null && request.auth.uid == uid
         && request.resource.data.bestScore is int
-        && request.resource.data.bestScore >= resource.data.bestScore;
+        && request.resource.data.bestScore >= resource.data.bestScore
+        && request.resource.data.displayName is string;
     }
 
     // Everything else is closed. Open a path here on purpose, never by default.

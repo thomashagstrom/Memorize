@@ -9,6 +9,8 @@ import {
 } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 
+import Link from 'next/link';
+
 import { loadBest, recordScore } from '@/lib/bestScore';
 import { getFirebase } from '@/lib/firebase';
 
@@ -51,7 +53,8 @@ export default function GameShell() {
   async function onGameOver(score: number) {
     if (!uid) return; // Guests can play, but nothing is saved.
     try {
-      setBest({ uid, value: await recordScore(uid, score) });
+      const displayName = user?.displayName ?? user?.email ?? 'Player';
+      setBest({ uid, value: await recordScore(uid, score, displayName) });
     } catch {
       setError('Could not save your score.');
     }
@@ -60,6 +63,9 @@ export default function GameShell() {
   return (
     <>
       <header className="flex items-center justify-end gap-3 p-4">
+        <Link href="/leaderboard" className="rounded border px-3 py-1">
+          Leaderboard
+        </Link>
         {user === undefined ? null : user === null ? (
           <button
             className="rounded border px-3 py-1"
