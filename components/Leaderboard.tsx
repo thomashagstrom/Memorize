@@ -3,8 +3,13 @@
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 
-import { loadLeaderboard, type Leaderboard as LeaderboardData } from '@/lib/bestScore';
+import {
+  loadDailyLeaderboard,
+  loadLeaderboard,
+  type Leaderboard as LeaderboardData,
+} from '@/lib/bestScore';
 import { getFirebase } from '@/lib/firebase';
+import { utcDay } from '@/lib/gameSession';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -13,13 +18,19 @@ export default function Leaderboard() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  const [view, setView] = useState<'all-time' | 'daily'>('all-time');
 
   useEffect(() => onAuthStateChanged(getFirebase().auth, setUser), []);
+
+  // The daily board is today's (UTC) scores, so it is empty again after midnight UTC.
+  const load = (uid: string | null) =>
+    view === 'daily' ? loadDailyLeaderboard(utcDay(Date.now())) : loadLeaderboard(uid);
 
   useEffect(() => {
     if (user === undefined) return;
     let current = true;
-    loadLeaderboard(user?.uid ?? null).then(
+    setStatus('loading');
+    load(user?.uid ?? null).then(
       (result) => {
         if (!current) return;
         setData(result);
@@ -30,12 +41,13 @@ export default function Leaderboard() {
     return () => {
       current = false;
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, view]);
 
   async function retry() {
     setStatus('loading');
     try {
-      setData(await loadLeaderboard(user?.uid ?? null));
+      setData(await load(user?.uid ?? null));
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -44,7 +56,23 @@ export default function Leaderboard() {
 
   return (
     <section aria-label="Leaderboard" className="flex w-full max-w-md flex-col gap-4">
-      <h1 className="text-center text-2xl font-bold">All-time highscores</h1>
+      <h1 className="text-center text-2xl font-bold">
+        {view === 'daily' ? 'Daily challenge' : 'All-time highscores'}
+      </h1>
+      <div className="flex justify-center gap-2">
+        {(['all-time', 'daily'] as const).map((v) => (
+          <button
+            key={v}
+            aria-pressed={view === v}
+            className={`rounded border-2 border-blue-700 px-3 py-1 ${
+              view === v ? 'bg-blue-700 text-white' : 'text-blue-700'
+            }`}
+            onClick={() => setView(v)}
+          >
+            {v === 'daily' ? 'Today' : 'All-time'}
+          </button>
+        ))}
+      </div>
       {status === 'loading' ? (
         <ul className="flex flex-col gap-2" aria-label="Loading leaderboard">
           {Array.from({ length: 10 }, (_, i) => (

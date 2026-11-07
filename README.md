@@ -58,5 +58,13 @@ npm run dev         # in a second terminal
   Admin SDK with the app's default credentials on App Hosting, or the emulators when
   `NEXT_PUBLIC_FIREBASE_PROJECT_ID` is unset. No new setting is needed. The rules change
   has no automated test: it is not run against the emulator here.
+- The daily challenge (the "Daily challenge" button, `POST /api/game/start` with
+  `{ "daily": true }`) plays the same patterns for everyone on a UTC day: they are seeded
+  by the day and round (`seededRandom` in `lib/gridFlash.ts`). A player's first daily
+  game of a UTC day is their one counted attempt, stored by the server in
+  `dailyScores/{day}_{uid}`; later ones that day are practice and are not stored. The
+  "Today" tab of the leaderboard lists that day's top scores, so it starts empty at
+  midnight UTC. `firestore.rules` and `firestore.indexes.json` cover `dailyScores`; deploy
+  both. Neither is tested against the emulator here.
 - `apphosting.yaml` sets the limits for Firebase App Hosting, where this app is
   deployed once a Firebase project is connected.

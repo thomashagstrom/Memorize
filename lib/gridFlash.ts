@@ -24,6 +24,20 @@ export function pickCells(count: number, random: () => number = Math.random): nu
   return cells.slice(0, Math.min(count, CELL_COUNT));
 }
 
+/** A repeatable random function: the same seed always gives the same sequence (mulberry32). */
+export function seededRandom(seed: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** Number of cells lit in a round (rounds start at 1); one more each round. */
 export function cellsForRound(round: number): number {
   return Math.min(FIRST_ROUND_CELLS + round - 1, CELL_COUNT);

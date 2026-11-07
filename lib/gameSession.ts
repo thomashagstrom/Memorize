@@ -1,4 +1,4 @@
-import { cellsForRound, pickCells } from '@/lib/gridFlash';
+import { cellsForRound, pickCells, seededRandom } from '@/lib/gridFlash';
 
 /** Time the player is shown the pattern before they can answer. */
 export const MIN_VIEW_MS = 1200;
@@ -18,6 +18,10 @@ export type Game = {
   over: boolean;
   /** Set when an impossible answer was rejected: the game never reaches the leaderboard. */
   voided: boolean;
+  /** Set on a daily challenge game: the UTC day whose patterns it plays. */
+  day?: string;
+  /** On a daily game: true for the player's one counted attempt that day, false for practice. */
+  counted?: boolean;
 };
 
 export type Outcome =
@@ -25,15 +29,34 @@ export type Outcome =
   | { kind: 'over'; game: Game }
   | { kind: 'rejected'; game: Game };
 
-export function newGame(uid: string, now: number, random?: () => number): Game {
+/** The UTC day of a moment, like "2026-11-07": the daily challenge is the same worldwide. */
+export const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
+
+/** The cells for `level` of a game: shared by everyone on a daily day, otherwise random. */
+function targetsFor(level: number, day?: string, random?: () => number): number[] {
+  return pickCells(cellsForRound(level), day ? seededRandom(`${day}:${level}`) : random);
+}
+
+/**
+ * Starts a game. With a `day` it is that UTC day's daily challenge, whose patterns
+ * depend only on the day and round; `counted` says whether it is the player's one
+ * counted attempt that day.
+ */
+export function newGame(
+  uid: string,
+  now: number,
+  random?: () => number,
+  daily?: { day: string; counted: boolean },
+): Game {
   return {
     uid,
     level: 1,
-    targets: pickCells(cellsForRound(1), random),
+    targets: targetsFor(1, daily?.day, random),
     issuedAt: now,
     score: 0,
     over: false,
     voided: false,
+    ...daily,
   };
 }
 
@@ -74,7 +97,7 @@ export function submitAnswer(
     ...game,
     level,
     score: game.score + 1,
-    targets: pickCells(cellsForRound(level), random),
+    targets: targetsFor(level, game.day, random),
     issuedAt: now,
   };
   return { kind: 'continue', game: next };
