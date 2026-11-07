@@ -7,12 +7,13 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import Link from 'next/link';
 
-import { loadBest, recordScore } from '@/lib/bestScore';
+import { loadBest } from '@/lib/bestScore';
 import { getFirebase } from '@/lib/firebase';
+import { createRemoteGame, type RemoteGame } from '@/lib/gameClient';
 
 import GridFlash from './GridFlash';
 
@@ -50,15 +51,25 @@ export default function GameShell() {
     }
   }
 
-  async function onGameOver(score: number) {
-    if (!uid) return; // Guests can play, but nothing is saved.
-    try {
-      const displayName = user?.displayName ?? user?.email ?? 'Player';
-      setBest({ uid, value: await recordScore(uid, score, displayName) });
-    } catch {
-      setError('Could not save your score.');
-    }
-  }
+  // Signed-in players play against the server, which issues the rounds and
+  // scores the answers. Guests play locally and nothing is saved.
+  const remote = useMemo<RemoteGame | undefined>(() => {
+    if (!user) return undefined;
+    const game = createRemoteGame(() => user.getIdToken());
+    return {
+      start: game.start,
+      async answer(taps) {
+        try {
+          const result = await game.answer(taps);
+          if (result.kind === 'over') setBest({ uid: user.uid, value: result.best });
+          return result;
+        } catch (e) {
+          setError('Could not save your score.');
+          throw e;
+        }
+      },
+    };
+  }, [user]);
 
   return (
     <>
@@ -89,7 +100,7 @@ export default function GameShell() {
         )}
       </header>
       {error ? <p role="alert" className="text-center">{error}</p> : null}
-      <GridFlash onGameOver={(score) => void onGameOver(score)} />
+      <GridFlash remote={remote} />
     </>
   );
 }

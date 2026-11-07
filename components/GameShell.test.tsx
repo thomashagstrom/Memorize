@@ -7,7 +7,8 @@ const h = vi.hoisted(() => ({
   signInWithPopup: vi.fn(),
   signOut: vi.fn(),
   loadBest: vi.fn(),
-  recordScore: vi.fn(),
+  start: vi.fn(),
+  answer: vi.fn(),
 }));
 
 vi.mock('firebase/auth', () => ({
@@ -20,16 +21,25 @@ vi.mock('firebase/auth', () => ({
   signOut: h.signOut,
 }));
 vi.mock('@/lib/firebase', () => ({ getFirebase: () => ({ auth: {}, db: {} }) }));
-vi.mock('@/lib/bestScore', () => ({ loadBest: h.loadBest, recordScore: h.recordScore }));
+vi.mock('@/lib/bestScore', () => ({ loadBest: h.loadBest }));
+vi.mock('@/lib/gameClient', () => ({
+  createRemoteGame: () => ({ start: h.start, answer: h.answer }),
+}));
 
 import GameShell from './GameShell';
 
-const player = { uid: 'u1', displayName: 'Ada Lovelace', email: 'ada@example.com' };
+const player = {
+  uid: 'u1',
+  displayName: 'Ada Lovelace',
+  email: 'ada@example.com',
+  getIdToken: async () => 'test-token',
+};
 const cells = () => screen.getAllByRole('button', { name: /^Cell / });
 
 /** Plays one game and taps a wrong cell straight away: final score 0. */
-function loseGame() {
+async function loseGame() {
   fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+  await act(async () => {}); // let a server-issued first round arrive
   const lit = cells().flatMap((c, i) => (c.getAttribute('data-lit') === 'true' ? [i] : []));
   act(() => void vi.advanceTimersByTime(5000));
   fireEvent.click(cells().find((_, i) => !lit.includes(i))!);
@@ -40,7 +50,7 @@ describe('Sign in with Google', () => {
     vi.useFakeTimers();
     h.listener = null;
     h.loadBest.mockResolvedValue(5);
-    h.recordScore.mockImplementation(async (_uid: string, score: number) => Math.max(5, score));
+    h.start.mockResolvedValue([0, 1]);
   });
   afterEach(() => {
     cleanup();
@@ -70,20 +80,36 @@ describe('Sign in with Google', () => {
     expect(h.loadBest).toHaveBeenCalledWith('u1');
   });
 
-  it('saves the score when a signed-in player finishes a game', async () => {
+  it('has the server issue the rounds and score the answers for a signed-in player', async () => {
+    h.answer.mockResolvedValue({ kind: 'over', best: 7 });
     render(<GameShell />);
     act(() => h.listener!(player));
-    loseGame();
-    expect(h.recordScore).toHaveBeenCalledWith('u1', 0, 'Ada Lovelace');
-    await vi.waitFor(() => expect(screen.getByTestId('best-score').textContent).toBe('5'));
+    await loseGame();
+    await vi.waitFor(() => expect(screen.getByTestId('best-score').textContent).toBe('7'));
+    expect(h.start).toHaveBeenCalledTimes(1);
+    // Only the taps go to the server, never a score.
+    expect(h.answer).toHaveBeenCalledTimes(1);
+    expect(h.answer.mock.calls[0]).toHaveLength(1);
+    expect(h.answer.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it('lets a signed-out player play without saving anything', () => {
+  it('shows an error and keeps the old best when the server rejects the result', async () => {
+    h.answer.mockRejectedValue(new Error('Request failed: 422'));
+    render(<GameShell />);
+    act(() => h.listener!(player));
+    await vi.waitFor(() => expect(screen.getByTestId('best-score').textContent).toBe('5'));
+    await loseGame();
+    await vi.waitFor(() => expect(screen.getByRole('alert').textContent).toBe('Could not save your score.'));
+    expect(screen.getByTestId('best-score').textContent).toBe('5');
+  });
+
+  it('lets a signed-out player play without saving anything', async () => {
     render(<GameShell />);
     act(() => h.listener!(null));
-    loseGame();
+    await loseGame();
     expect(screen.getByText('Game over')).toBeTruthy();
-    expect(h.recordScore).not.toHaveBeenCalled();
+    expect(h.start).not.toHaveBeenCalled();
+    expect(h.answer).not.toHaveBeenCalled();
     expect(h.loadBest).not.toHaveBeenCalled();
   });
 });

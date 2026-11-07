@@ -7,7 +7,6 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
   where,
 } from 'firebase/firestore';
 
@@ -27,24 +26,6 @@ const profilesCollection = () => collection(getFirebase().db, 'profiles');
 export async function loadBest(uid: string): Promise<number> {
   const snap = await getDoc(profileRef(uid));
   return (snap.data()?.bestScore as number | undefined) ?? 0;
-}
-
-/**
- * Saves `score` as the personal best only if it is higher, alongside the
- * player's current display name. Returns the best after saving.
- */
-export async function recordScore(
-  uid: string,
-  score: number,
-  displayName: string,
-): Promise<number> {
-  const ref = profileRef(uid);
-  return runTransaction(getFirebase().db, async (tx) => {
-    const stored = (await tx.get(ref)).data()?.bestScore as number | undefined;
-    const best = nextBest(stored, score);
-    tx.set(ref, { bestScore: best, displayName });
-    return best;
-  });
 }
 
 export type LeaderboardEntry = {
