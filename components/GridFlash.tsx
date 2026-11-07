@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import type { RemoteGame } from '@/lib/gameClient';
-import { CELL_COUNT, GRID_SIZE, startRound, tapCell, type Round } from '@/lib/gridFlash';
+import { gridSizeForRound, startRound, tapCell, type Round } from '@/lib/gridFlash';
 
 const FLASH_MS = 1200;
 
@@ -113,15 +113,20 @@ export default function GridFlash({
     );
   }
 
+  const size = gridSizeForRound(level);
+
   return (
-    <section className="flex flex-col items-center gap-4" aria-label="Grid Flash">
+    <section className="flex w-full flex-col items-center gap-4" aria-label="Grid Flash">
       <p>Round {level}</p>
       <p aria-live="polite">{phase === 'loading' ? 'Loading…' : phase === 'showing' ? 'Watch…' : 'Your turn'}</p>
       <div
-        className="grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))` }}
+        className="grid w-full gap-1"
+        style={{
+          gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
+          maxWidth: `${size * 5}rem`,
+        }}
       >
-        {Array.from({ length: CELL_COUNT }, (_, cell) => {
+        {Array.from({ length: size * size }, (_, cell) => {
           const lit =
             (phase === 'showing' && round.targets.includes(cell)) ||
             (phase === 'input' && round.taps.includes(cell));
@@ -132,7 +137,7 @@ export default function GridFlash({
               data-lit={lit}
               disabled={phase !== 'input'}
               onClick={() => onTap(cell)}
-              className={`h-20 w-20 rounded border-2 border-blue-900 ${
+              className={`aspect-square w-full rounded border-2 border-blue-900 ${
                 lit ? 'bg-yellow-300' : 'bg-slate-200'
               }`}
             />

@@ -1,4 +1,4 @@
-import { cellsForRound, pickCells } from '@/lib/gridFlash';
+import { cellsForRound, gridSizeForRound, pickCells } from '@/lib/gridFlash';
 
 /** Time the player is shown the pattern before they can answer. */
 export const MIN_VIEW_MS = 1200;
@@ -29,7 +29,7 @@ export function newGame(uid: string, now: number, random?: () => number): Game {
   return {
     uid,
     level: 1,
-    targets: pickCells(cellsForRound(1), random),
+    targets: pickCells(cellsForRound(1), gridSizeForRound(1), random),
     issuedAt: now,
     score: 0,
     over: false,
@@ -74,7 +74,7 @@ export function submitAnswer(
     ...game,
     level,
     score: game.score + 1,
-    targets: pickCells(cellsForRound(level), random),
+    targets: pickCells(cellsForRound(level), gridSizeForRound(level), random),
     issuedAt: now,
   };
   return { kind: 'continue', game: next };

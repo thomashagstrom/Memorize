@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { gridSizeForRound } from './gridFlash';
 import { MIN_TAP_MS, MIN_VIEW_MS, newGame, submitAnswer } from './gameSession';
 
 const T0 = 1_000_000;
@@ -15,6 +16,25 @@ describe('server-issued rounds', () => {
     expect(outcome.kind).toBe('continue');
     expect(outcome.game.level).toBe(2);
     expect(outcome.game.targets).toHaveLength(3);
+  });
+});
+
+describe('endless rounds', () => {
+  it('keeps a correct player going past round 10 on a grid that fits every lit cell', () => {
+    let game = newGame('u1', T0);
+    let now = T0;
+    for (let round = 1; round <= 15; round++) {
+      const previous = game.targets;
+      now += MIN_VIEW_MS + MIN_TAP_MS * previous.length + 1;
+      const outcome = submitAnswer(game, round, [...previous], now);
+      expect(outcome.kind).toBe('continue');
+      game = outcome.game;
+      expect(game.targets).not.toEqual(previous);
+      expect(game.targets.length).toBeLessThan(gridSizeForRound(game.level) ** 2);
+      expect(Math.max(...game.targets)).toBeLessThan(gridSizeForRound(game.level) ** 2);
+    }
+    expect(game.level).toBe(16);
+    expect(game.score).toBe(15);
   });
 });
 

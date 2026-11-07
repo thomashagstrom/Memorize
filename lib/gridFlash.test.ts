@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cellsForRound, pickCells, startRound, tapCell } from './gridFlash';
+import { cellsForRound, gridSizeForRound, pickCells, startRound, tapCell } from './gridFlash';
 
 describe('grid flash round logic', () => {
   it('adds one more lit cell each round', () => {
@@ -9,7 +9,39 @@ describe('grid flash round logic', () => {
   });
 
   it('picks distinct cells', () => {
-    expect(new Set(pickCells(5)).size).toBe(5);
+    expect(new Set(pickCells(5, 3)).size).toBe(5);
+  });
+
+  it('grows the grid so lit cells never cover more than half of it, at any level', () => {
+    let previousSize = 0;
+    for (let round = 1; round <= 60; round++) {
+      const size = gridSizeForRound(round);
+      expect(cellsForRound(round) * 2).toBeLessThanOrEqual(size * size);
+      expect(cellsForRound(round)).toBeLessThan(size * size);
+      expect(size).toBeGreaterThanOrEqual(previousSize);
+      previousSize = size;
+    }
+    expect(gridSizeForRound(1)).toBe(3);
+    expect(gridSizeForRound(8)).toBeGreaterThan(gridSizeForRound(1));
+  });
+
+  it('has no maximum level: round 11 and beyond still light a valid pattern', () => {
+    for (const round of [11, 25, 100]) {
+      const { targets } = startRound(round);
+      const cellCount = gridSizeForRound(round) ** 2;
+      expect(targets).toHaveLength(cellsForRound(round));
+      expect(new Set(targets).size).toBe(targets.length);
+      expect(targets.every((c) => c >= 0 && c < cellCount)).toBe(true);
+    }
+  });
+
+  it('never repeats the previous round pattern or lights every cell', () => {
+    for (let round = 2; round <= 60; round++) {
+      const prev = startRound(round - 1).targets;
+      const next = startRound(round).targets;
+      expect(next.length).not.toBe(prev.length);
+      expect(next.length).toBeLessThan(gridSizeForRound(round) ** 2);
+    }
   });
 
   it('completes the round once every lit cell is tapped, in any order', () => {
