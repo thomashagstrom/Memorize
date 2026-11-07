@@ -7,3 +7,24 @@ runConfig:
   memoryMiB: 512
   minInstances: 0
   maxInstances: 2
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyAJUKCqM4mcmvuBAxAm4F-4UY6rohzYTe4
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: memorize-642y2.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: memorize-642y2
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:485241720013:web:24f971410a3b7dcbfd6d84
+    availability:
+      - BUILD
+      - RUNTIME
