@@ -62,6 +62,28 @@ export function buildLeaderboard(
 }
 
 /**
+ * Loads the top `LEADERBOARD_SIZE` counted scores of one UTC `day` (like "2026-11-07").
+ * Each day has its own scores, so the board starts empty at midnight UTC.
+ */
+export async function loadDailyLeaderboard(day: string): Promise<Leaderboard> {
+  const snap = await getDocs(
+    query(
+      collection(getFirebase().db, 'dailyScores'),
+      where('day', '==', day),
+      orderBy('score', 'desc'),
+      limit(LEADERBOARD_SIZE),
+    ),
+  );
+  const top: LeaderboardEntry[] = snap.docs.map((d, i) => ({
+    uid: d.data().uid as string,
+    displayName: (d.data().displayName as string | undefined) ?? 'Player',
+    score: (d.data().score as number | undefined) ?? 0,
+    rank: i + 1,
+  }));
+  return { top, self: null };
+}
+
+/**
  * Loads the top `LEADERBOARD_SIZE` players by best score, and, when
  * `selfUid` is signed in and outside that list, their own rank and score.
  */

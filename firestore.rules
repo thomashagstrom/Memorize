@@ -19,6 +19,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Any signed-in person can read each day's daily challenge scores. Only the
+    // game's server writes them, once per player per day.
+    match /dailyScores/{entry} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // Everything else is closed. Open a path here on purpose, never by default.
   }
 }

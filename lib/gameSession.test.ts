@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MIN_TAP_MS, MIN_VIEW_MS, newGame, submitAnswer } from './gameSession';
+import { MIN_TAP_MS, MIN_VIEW_MS, newGame, submitAnswer, utcDay } from './gameSession';
 
 const T0 = 1_000_000;
 const slow = (taps: number) => T0 + MIN_VIEW_MS + MIN_TAP_MS * taps + 1;
@@ -33,6 +33,31 @@ describe('server-computed score', () => {
     expect(end.kind).toBe('over');
     expect(end.game.score).toBe(3);
     expect(end.game.voided).toBe(false);
+  });
+});
+
+describe('daily challenge patterns', () => {
+  const DAY1 = Date.UTC(2026, 10, 7, 23, 59);
+  const DAY2 = Date.UTC(2026, 10, 8, 0, 1);
+
+  /** The targets of the first four rounds a player plays on `now`'s UTC day. */
+  function patterns(uid: string, now: number) {
+    let game = newGame(uid, now, undefined, { day: utcDay(now), counted: true });
+    const seen = [game.targets];
+    for (let round = 1; round <= 3; round++) {
+      game = submitAnswer(game, round, [...game.targets], now + 10_000 * round).game;
+      seen.push(game.targets);
+    }
+    return seen;
+  }
+
+  it('gives every player the same sequence of patterns on a given day', () => {
+    expect(patterns('u1', DAY1)).toEqual(patterns('u2', DAY1 - 5 * 60_000));
+  });
+
+  it('gives a different sequence of patterns on the next UTC day', () => {
+    expect(utcDay(DAY1)).not.toBe(utcDay(DAY2));
+    expect(patterns('u1', DAY2)).not.toEqual(patterns('u1', DAY1));
   });
 });
 

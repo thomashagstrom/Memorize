@@ -62,7 +62,7 @@ export default function GridFlash({
     );
   }
 
-  function newGame() {
+  function newGame(daily = false) {
     setLevel(1);
     if (!remote) {
       setRound(startRound(1));
@@ -70,7 +70,7 @@ export default function GridFlash({
       return;
     }
     setPhase('loading');
-    remote.start().then(
+    remote.start(daily).then(
       (targets) => {
         setRound({ targets, taps: [] });
         setPhase('showing');
@@ -88,10 +88,18 @@ export default function GridFlash({
         <p>Test your memory</p>
         <button
           className="rounded bg-blue-700 px-6 py-3 text-white hover:bg-blue-800"
-          onClick={newGame}
+          onClick={() => newGame()}
         >
           Play
         </button>
+        {remote ? (
+          <button
+            className="rounded border-2 border-blue-700 px-6 py-3 text-blue-700"
+            onClick={() => newGame(true)}
+          >
+            Daily challenge
+          </button>
+        ) : null}
       </section>
     );
   }
@@ -105,10 +113,18 @@ export default function GridFlash({
         </p>
         <button
           className="rounded bg-blue-700 px-6 py-3 text-white hover:bg-blue-800"
-          onClick={newGame}
+          onClick={() => newGame()}
         >
           Play again
         </button>
+        {remote ? (
+          <button
+            className="rounded border-2 border-blue-700 px-6 py-3 text-blue-700"
+            onClick={() => newGame(true)}
+          >
+            Daily challenge
+          </button>
+        ) : null}
       </section>
     );
   }
