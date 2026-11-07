@@ -1,7 +1,7 @@
 'use client';
 
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   loadDailyLeaderboard,
@@ -23,13 +23,15 @@ export default function Leaderboard() {
   useEffect(() => onAuthStateChanged(getFirebase().auth, setUser), []);
 
   // The daily board is today's (UTC) scores, so it is empty again after midnight UTC.
-  const load = (uid: string | null) =>
-    view === 'daily' ? loadDailyLeaderboard(utcDay(Date.now())) : loadLeaderboard(uid);
+  const load = useCallback(
+    (uid: string | null) =>
+      view === 'daily' ? loadDailyLeaderboard(utcDay(Date.now())) : loadLeaderboard(uid),
+    [view],
+  );
 
   useEffect(() => {
     if (user === undefined) return;
     let current = true;
-    setStatus('loading');
     load(user?.uid ?? null).then(
       (result) => {
         if (!current) return;
@@ -41,8 +43,7 @@ export default function Leaderboard() {
     return () => {
       current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, view]);
+  }, [user, load]);
 
   async function retry() {
     setStatus('loading');
@@ -67,7 +68,11 @@ export default function Leaderboard() {
             className={`rounded border-2 border-blue-700 px-3 py-1 ${
               view === v ? 'bg-blue-700 text-white' : 'text-blue-700'
             }`}
-            onClick={() => setView(v)}
+            onClick={() => {
+              if (v === view) return;
+              setStatus('loading');
+              setView(v);
+            }}
           >
             {v === 'daily' ? 'Today' : 'All-time'}
           </button>
