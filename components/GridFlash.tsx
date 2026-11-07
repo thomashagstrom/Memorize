@@ -2,19 +2,23 @@
 
 import { useEffect, useState } from 'react';
 
+import type { RemoteGame } from '@/lib/gameClient';
 import { CELL_COUNT, GRID_SIZE, startRound, tapCell, type Round } from '@/lib/gridFlash';
 
 const FLASH_MS = 1200;
 
-type Phase = 'idle' | 'showing' | 'input' | 'over';
+type Phase = 'idle' | 'loading' | 'showing' | 'input' | 'over';
 
 /** Grid Flash: watch the lit cells, then tap them from memory. */
 export default function GridFlash({
   flashMs = FLASH_MS,
   onGameOver,
+  remote,
 }: {
   flashMs?: number;
   onGameOver?: (score: number) => void;
+  /** When given, the server issues every round and scores the answers. */
+  remote?: RemoteGame;
 }) {
   const [level, setLevel] = useState(1);
   // The first round is drawn on Play, not while rendering, so prerender and hydration agree.
@@ -27,25 +31,52 @@ export default function GridFlash({
     return () => clearTimeout(timer);
   }, [phase, round, flashMs]);
 
+  function endGame() {
+    setPhase('over');
+    onGameOver?.(level - 1);
+  }
+
+  function nextRound(targets: number[]) {
+    setLevel(level + 1);
+    setRound({ targets, taps: [] });
+    setPhase('showing');
+  }
+
   function onTap(cell: number) {
     if (phase !== 'input') return;
     const result = tapCell(round, cell);
-    if (result.kind === 'wrong') {
-      setPhase('over');
-      onGameOver?.(level - 1);
-    } else if (result.kind === 'complete') {
-      setLevel(level + 1);
-      setRound(startRound(level + 1));
-      setPhase('showing');
-    } else {
+    if (result.kind === 'continue') {
       setRound(result.round);
+      return;
     }
+    if (!remote) {
+      if (result.kind === 'wrong') endGame();
+      else nextRound(startRound(level + 1).targets);
+      return;
+    }
+    // The server judges the taps and issues the next round, if any.
+    setPhase('loading');
+    remote.answer([...round.taps, cell]).then(
+      (reply) => (reply.kind === 'continue' ? nextRound(reply.targets) : endGame()),
+      endGame,
+    );
   }
 
   function newGame() {
     setLevel(1);
-    setRound(startRound(1));
-    setPhase('showing');
+    if (!remote) {
+      setRound(startRound(1));
+      setPhase('showing');
+      return;
+    }
+    setPhase('loading');
+    remote.start().then(
+      (targets) => {
+        setRound({ targets, taps: [] });
+        setPhase('showing');
+      },
+      () => setPhase('idle'),
+    );
   }
 
   // Score is the number of rounds completed.
@@ -85,7 +116,7 @@ export default function GridFlash({
   return (
     <section className="flex flex-col items-center gap-4" aria-label="Grid Flash">
       <p>Round {level}</p>
-      <p aria-live="polite">{phase === 'showing' ? 'Watch…' : 'Your turn'}</p>
+      <p aria-live="polite">{phase === 'loading' ? 'Loading…' : phase === 'showing' ? 'Watch…' : 'Your turn'}</p>
       <div
         className="grid gap-2"
         style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))` }}

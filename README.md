@@ -50,5 +50,13 @@ npm run dev         # in a second terminal
 - `firestore.rules` is the security policy. It is closed by default: each signed-in
   person can read and write only their own `notes`. Open a new path on purpose, and
   review every change to this file.
+- Scores are checked by the server. For a signed-in player, `app/api/game/start` and
+  `app/api/game/answer` (logic in `lib/gameSession.ts`, storage in `lib/gameServer.ts`)
+  issue each round, score the submitted taps, and reject impossible results silently
+  (too fast, a round never issued, a game submitted twice). Only the server writes
+  `profiles`; `firestore.rules` denies every browser write. The server uses the Firebase
+  Admin SDK with the app's default credentials on App Hosting, or the emulators when
+  `NEXT_PUBLIC_FIREBASE_PROJECT_ID` is unset. No new setting is needed. The rules change
+  has no automated test: it is not run against the emulator here.
 - `apphosting.yaml` sets the limits for Firebase App Hosting, where this app is
   deployed once a Firebase project is connected.
