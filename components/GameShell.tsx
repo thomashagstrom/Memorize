@@ -57,7 +57,16 @@ export default function GameShell() {
     if (!user) return undefined;
     const game = createRemoteGame(() => user.getIdToken());
     return {
-      start: game.start,
+      async start() {
+        try {
+          const targets = await game.start();
+          setError(null);
+          return targets;
+        } catch (e) {
+          setError('Could not start the game. Please try again.');
+          throw e;
+        }
+      },
       async answer(taps) {
         try {
           const result = await game.answer(taps);
