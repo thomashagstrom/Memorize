@@ -24,7 +24,6 @@ export default function Leaderboard() {
     if (user === undefined) return;
     let current = true;
     const loadBoard = board === 'daily' ? loadDailyLeaderboard : loadLeaderboard;
-    setStatus('loading');
     loadBoard(user?.uid ?? null).then(
       (result) => {
         if (!current) return;
@@ -59,7 +58,11 @@ export default function Leaderboard() {
             key={b}
             aria-pressed={board === b}
             className={`rounded border px-3 py-1 ${board === b ? 'bg-blue-700 text-white' : ''}`}
-            onClick={() => setBoard(b)}
+            onClick={() => {
+              if (b === board) return;
+              setStatus('loading');
+              setBoard(b);
+            }}
           >
             {b === 'daily' ? 'Today' : 'All-time'}
           </button>
