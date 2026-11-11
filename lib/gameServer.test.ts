@@ -81,4 +81,35 @@ describe('daily challenge attempts', () => {
     await finishWithScoreZero(alice, game.gameId, game.targets);
     expect(dailyScores()).toHaveLength(0);
   });
+
+  it('lets a brand new player with no profile or best score start a daily game', async () => {
+    expect(store.has('profiles/alice')).toBe(false);
+    const game = await startGame(alice, true);
+    expect(game.gameId).toBeTruthy();
+    expect(game.targets.length).toBeGreaterThan(0);
+  });
+
+  it('lets a brand new player with no profile or best score start a free play game', async () => {
+    expect(store.has('profiles/alice')).toBe(false);
+    const game = await startGame(alice, false);
+    expect(game.gameId).toBeTruthy();
+    expect(game.targets.length).toBeGreaterThan(0);
+  });
+
+  // Firestore rejects a document with an `undefined` field value, so a free play
+  // game (which has no `day`/`counted`) must omit those keys rather than set them
+  // to `undefined` - a real cause of a 500 on an otherwise valid request.
+  it('stores a free play game with no undefined fields', async () => {
+    const game = await startGame(alice, false);
+    const stored = store.get(`games/${game.gameId}`)!;
+    expect(stored).not.toHaveProperty('day');
+    expect(stored).not.toHaveProperty('counted');
+    expect(Object.values(stored)).not.toContain(undefined);
+  });
+
+  it('stores a daily game with no undefined fields', async () => {
+    const game = await startGame(alice, true);
+    const stored = store.get(`games/${game.gameId}`)!;
+    expect(Object.values(stored)).not.toContain(undefined);
+  });
 });
