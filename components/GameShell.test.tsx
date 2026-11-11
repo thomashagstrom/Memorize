@@ -103,6 +103,17 @@ describe('Sign in with Google', () => {
     expect(screen.getByTestId('best-score').textContent).toBe('5');
   });
 
+  it('shows an error when the game fails to start, instead of silently returning to Play', async () => {
+    h.start.mockRejectedValue(new Error('network error'));
+    render(<GameShell />);
+    act(() => h.listener!(player));
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await vi.waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('Could not start the game. Please try again.'),
+    );
+    expect(screen.queryAllByRole('button', { name: /^Cell / })).toHaveLength(0);
+  });
+
   it('lets a signed-out player play without saving anything', async () => {
     render(<GameShell />);
     act(() => h.listener!(null));
