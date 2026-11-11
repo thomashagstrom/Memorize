@@ -41,6 +41,24 @@ describe('Grid Flash', () => {
     expect(cells().every((c) => !(c as HTMLButtonElement).disabled)).toBe(true);
   });
 
+  it('shows the round number and the number of cells to remember during play', () => {
+    render(<GridFlash />);
+    play();
+    expect(screen.getByText('Round 1')).toBeTruthy();
+    expect(screen.getByText('Cells to remember: 2')).toBeTruthy();
+    playRoundCorrectly();
+    expect(screen.getByText('Round 2')).toBeTruthy();
+    expect(screen.getByText('Cells to remember: 3')).toBeTruthy();
+  });
+
+  it('keeps a larger pattern visible longer than the first round', () => {
+    render(<GridFlash />);
+    play();
+    playRoundCorrectly();
+    act(() => void vi.advanceTimersByTime(1200));
+    expect(litIndexes()).toHaveLength(3);
+  });
+
   it('adds one more lit cell after a fully correct round', () => {
     render(<GridFlash />);
     play();

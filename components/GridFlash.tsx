@@ -3,15 +3,13 @@
 import { useEffect, useState } from 'react';
 
 import type { RemoteGame } from '@/lib/gameClient';
-import { gridSizeForRound, startRound, tapCell, type Round } from '@/lib/gridFlash';
-
-const FLASH_MS = 1200;
+import { gridSizeForRound, startRound, tapCell, viewMsForCells, type Round } from '@/lib/gridFlash';
 
 type Phase = 'idle' | 'loading' | 'showing' | 'input' | 'over';
 
 /** Grid Flash: watch the lit cells, then tap them from memory. */
 export default function GridFlash({
-  flashMs = FLASH_MS,
+  flashMs,
   onGameOver,
   remote,
 }: {
@@ -27,7 +25,7 @@ export default function GridFlash({
 
   useEffect(() => {
     if (phase !== 'showing') return;
-    const timer = setTimeout(() => setPhase('input'), flashMs);
+    const timer = setTimeout(() => setPhase('input'), flashMs ?? viewMsForCells(round.targets.length));
     return () => clearTimeout(timer);
   }, [phase, round, flashMs]);
 
@@ -118,6 +116,7 @@ export default function GridFlash({
   return (
     <section className="flex w-full flex-col items-center gap-4" aria-label="Grid Flash">
       <p>Round {level}</p>
+      <p>Cells to remember: {round.targets.length}</p>
       <p aria-live="polite">{phase === 'loading' ? 'Loading…' : phase === 'showing' ? 'Watch…' : 'Your turn'}</p>
       <div
         className="grid w-full gap-1"
