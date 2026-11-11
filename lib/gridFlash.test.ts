@@ -1,10 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
-import { cellsForRound, gridSizeForRound, pickCells, startRound, tapCell } from './gridFlash';
+import {
+  cellsForRound,
+  gridSizeForRound,
+  pickCells,
+  startRound,
+  tapCell,
+  viewMsForCells,
+} from './gridFlash';
 
 describe('grid flash round logic', () => {
-  it('adds one more lit cell each round', () => {
-    expect(cellsForRound(2) - cellsForRound(1)).toBe(1);
+  it('grows lit cells by about 25% per round, rounded up and by at least one, each step no smaller than the last', () => {
+    let previousStep = 0;
+    for (let round = 2; round <= 30; round++) {
+      const before = cellsForRound(round - 1);
+      const step = cellsForRound(round) - before;
+      expect(step).toBe(Math.max(1, Math.ceil(before * 0.25)));
+      expect(step).toBeGreaterThanOrEqual(previousStep);
+      previousStep = step;
+    }
+  });
+
+  it('shows a larger pattern for longer than a smaller one', () => {
+    expect(viewMsForCells(10)).toBeGreaterThan(viewMsForCells(5));
+    expect(viewMsForCells(5)).toBeGreaterThan(viewMsForCells(2));
+  });
+
+  it('lights as many cells as the round calls for', () => {
     expect(startRound(3).targets).toHaveLength(cellsForRound(3));
   });
 
@@ -26,7 +48,7 @@ describe('grid flash round logic', () => {
   });
 
   it('has no maximum level: round 11 and beyond still light a valid pattern', () => {
-    for (const round of [11, 25, 100]) {
+    for (const round of [11, 25, 40]) {
       const { targets } = startRound(round);
       const cellCount = gridSizeForRound(round) ** 2;
       expect(targets).toHaveLength(cellsForRound(round));

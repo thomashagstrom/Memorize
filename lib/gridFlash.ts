@@ -46,9 +46,22 @@ export function utcDay(now: number): string {
   return new Date(now).toISOString().slice(0, 10);
 }
 
-/** Number of cells lit in a round (rounds start at 1); one more each round, with no maximum. */
+/** Growth in lit cells per round; the one setting to change to tune how fast patterns grow. */
+export const CELL_GROWTH_RATE = 0.25;
+
+/** Number of cells lit in a round (rounds start at 1); about 25% more each round, rounded up, at least one more. */
 export function cellsForRound(round: number): number {
-  return FIRST_ROUND_CELLS + round - 1;
+  let cells = FIRST_ROUND_CELLS;
+  for (let r = 1; r < round; r++) cells = Math.max(cells + 1, Math.ceil(cells * (1 + CELL_GROWTH_RATE)));
+  return cells;
+}
+
+export const BASE_VIEW_MS = 1200;
+export const VIEW_MS_PER_EXTRA_CELL = 250;
+
+/** How long a pattern of `cells` lit cells stays visible: longer for a larger pattern. */
+export function viewMsForCells(cells: number): number {
+  return BASE_VIEW_MS + VIEW_MS_PER_EXTRA_CELL * Math.max(0, cells - FIRST_ROUND_CELLS);
 }
 
 /** Side of the grid in a round: the smallest one where the lit cells cover at most half of it. */
