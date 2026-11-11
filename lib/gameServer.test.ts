@@ -81,4 +81,18 @@ describe('daily challenge attempts', () => {
     await finishWithScoreZero(alice, game.gameId, game.targets);
     expect(dailyScores()).toHaveLength(0);
   });
+
+  it('lets a brand new player with no profile or best score start a daily game', async () => {
+    expect(store.has('profiles/alice')).toBe(false);
+    const game = await startGame(alice, true);
+    expect(game.gameId).toBeTruthy();
+    expect(game.targets.length).toBeGreaterThan(0);
+  });
+
+  it('lets a brand new player with no profile or best score start a free play game', async () => {
+    expect(store.has('profiles/alice')).toBe(false);
+    const game = await startGame(alice, false);
+    expect(game.gameId).toBeTruthy();
+    expect(game.targets.length).toBeGreaterThan(0);
+  });
 });

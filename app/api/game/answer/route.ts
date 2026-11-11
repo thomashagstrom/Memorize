@@ -19,8 +19,13 @@ export async function POST(request: Request) {
     return Response.json({ error: 'bad request' }, { status: 400 });
   }
 
-  const result = await answerRound(player, body.gameId, body.round, body.taps as number[]);
-  // A rejected result says nothing about why.
-  if (result.kind === 'rejected') return Response.json({ error: 'rejected' }, { status: 422 });
-  return Response.json(result);
+  try {
+    const result = await answerRound(player, body.gameId, body.round, body.taps as number[]);
+    // A rejected result says nothing about why.
+    if (result.kind === 'rejected') return Response.json({ error: 'rejected' }, { status: 422 });
+    return Response.json(result);
+  } catch (e) {
+    console.error('Failed to score round', e);
+    return Response.json({ error: 'could not save score' }, { status: 500 });
+  }
 }
