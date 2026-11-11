@@ -1,4 +1,4 @@
-import { cellsForRound, gridSizeForRound, pickCells } from '@/lib/gridFlash';
+import { cellsForRound, gridSizeForRound, pickCells, seededRandom, utcDay } from '@/lib/gridFlash';
 
 /** Time the player is shown the pattern before they can answer. */
 export const MIN_VIEW_MS = 1200;
@@ -18,6 +18,10 @@ export type Game = {
   over: boolean;
   /** Set when an impossible answer was rejected: the game never reaches the leaderboard. */
   voided: boolean;
+  /** The UTC day (`YYYY-MM-DD`) of a daily challenge game; its patterns depend only on this day and the round. */
+  day?: string;
+  /** Whether this daily game is the player's one counted attempt of its day. */
+  counted?: boolean;
 };
 
 export type Outcome =
@@ -25,15 +29,28 @@ export type Outcome =
   | { kind: 'over'; game: Game }
   | { kind: 'rejected'; game: Game };
 
-export function newGame(uid: string, now: number, random?: () => number): Game {
+/** The random function for a round: seeded by the day in a daily game, otherwise the caller's or Math.random. */
+function randomFor(day: string | undefined, round: number, random?: () => number) {
+  return day ? seededRandom(`${day}:${round}`) : random;
+}
+
+/** Starts a game. With `daily`, the patterns are the same for every player on that UTC day. */
+export function newGame(
+  uid: string,
+  now: number,
+  random?: () => number,
+  daily?: { counted: boolean },
+): Game {
+  const day = daily ? utcDay(now) : undefined;
   return {
     uid,
     level: 1,
-    targets: pickCells(cellsForRound(1), gridSizeForRound(1), random),
+    targets: pickCells(cellsForRound(1), gridSizeForRound(1), randomFor(day, 1, random)),
     issuedAt: now,
     score: 0,
     over: false,
     voided: false,
+    ...(daily ? { day, counted: daily.counted } : {}),
   };
 }
 
@@ -74,7 +91,7 @@ export function submitAnswer(
     ...game,
     level,
     score: game.score + 1,
-    targets: pickCells(cellsForRound(level), gridSizeForRound(level), random),
+    targets: pickCells(cellsForRound(level), gridSizeForRound(level), randomFor(game.day, level, random)),
     issuedAt: now,
   };
   return { kind: 'continue', game: next };

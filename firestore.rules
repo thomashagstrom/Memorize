@@ -19,6 +19,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Daily challenge scores, one per player per UTC day, read for the daily leaderboard.
+    // Only the game's server writes them.
+    match /dailyScores/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // Everything else is closed. Open a path here on purpose, never by default.
   }
 }

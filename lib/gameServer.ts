@@ -5,6 +5,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 import { nextBest } from '@/lib/bestScore';
+import { utcDay } from '@/lib/gridFlash';
 import { newGame, submitAnswer, type Game } from '@/lib/gameSession';
 
 /**
@@ -39,13 +40,29 @@ export async function verifyPlayer(request: Request): Promise<Player | null> {
   }
 }
 
-/** Starts a game and returns its id with the first round's pattern. */
-export async function startGame(player: Player) {
+/**
+ * Starts a game and returns its id with the first round's pattern. A daily game
+ * uses the UTC day's patterns; a player's first one of the day is their counted
+ * attempt (recorded in `dailyScores`), later ones are practice.
+ */
+export async function startGame(player: Player, daily = false) {
   const { db } = admin();
   const gameId = randomUUID();
-  const game = newGame(player.uid, Date.now());
+  const now = Date.now();
+  let game: Game;
+  if (daily) {
+    const attemptRef = db.collection('dailyScores').doc(`${utcDay(now)}_${player.uid}`);
+    game = await db.runTransaction(async (tx) => {
+      const counted = !(await tx.get(attemptRef)).exists;
+      // The attempt has no score yet, so it stays off the leaderboard until the game ends.
+      if (counted) tx.set(attemptRef, { day: utcDay(now), uid: player.uid, displayName: player.displayName });
+      return newGame(player.uid, now, undefined, { counted });
+    });
+  } else {
+    game = newGame(player.uid, now);
+  }
   await db.collection('games').doc(gameId).set(game);
-  return { gameId, round: game.level, targets: game.targets };
+  return { gameId, round: game.level, targets: game.targets, counted: game.counted };
 }
 
 export type AnswerResponse =
@@ -82,6 +99,14 @@ export async function answerRound(
     }
     const best = nextBest(profileSnap.data()?.bestScore as number | undefined, outcome.game.score);
     tx.set(profileRef, { bestScore: best, displayName: player.displayName });
+    if (outcome.game.counted && outcome.game.day) {
+      tx.set(db.collection('dailyScores').doc(`${outcome.game.day}_${player.uid}`), {
+        day: outcome.game.day,
+        uid: player.uid,
+        displayName: player.displayName,
+        score: outcome.game.score,
+      });
+    }
     return { kind: 'over', score: outcome.game.score, best };
   });
 }

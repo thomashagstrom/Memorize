@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 
 import { getFirebase } from '@/lib/firebase';
+import { utcDay } from '@/lib/gridFlash';
 
 export const LEADERBOARD_SIZE = 50;
 
@@ -59,6 +60,29 @@ export function buildLeaderboard(
   const selfInTop = selfUid !== null && top.some((e) => e.uid === selfUid);
   const self = selfUid !== null && !selfInTop ? (ranked.find((e) => e.uid === selfUid) ?? null) : null;
   return { top, self };
+}
+
+/**
+ * Loads today's (UTC) daily challenge top scores. Only counted attempts are
+ * stored there, one per player, and a new day starts with none.
+ */
+export async function loadDailyLeaderboard(selfUid: string | null, now = Date.now()): Promise<Leaderboard> {
+  const snap = await getDocs(
+    query(
+      collection(getFirebase().db, 'dailyScores'),
+      where('day', '==', utcDay(now)),
+      orderBy('score', 'desc'),
+      limit(LEADERBOARD_SIZE),
+    ),
+  );
+  return buildLeaderboard(
+    snap.docs.map((d) => ({
+      uid: d.data().uid as string,
+      displayName: (d.data().displayName as string | undefined) ?? 'Player',
+      score: d.data().score as number,
+    })),
+    selfUid,
+  );
 }
 
 /**
