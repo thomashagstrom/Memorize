@@ -19,6 +19,29 @@ describe('server-issued rounds', () => {
   });
 });
 
+describe('daily challenge patterns', () => {
+  const DAY1 = Date.UTC(2026, 0, 5, 3);
+  const play = (uid: string, start: number) => {
+    let game = newGame(uid, start, undefined, { counted: true });
+    const seen = [game.targets];
+    let now = start;
+    for (let round = 1; round <= 6; round++) {
+      now += MIN_VIEW_MS + MIN_TAP_MS * game.targets.length + 1;
+      game = submitAnswer(game, round, [...game.targets], now).game;
+      seen.push(game.targets);
+    }
+    return seen;
+  };
+
+  it('gives every player the same sequence of patterns on a given UTC day', () => {
+    expect(play('u1', DAY1)).toEqual(play('u2', DAY1 + 20 * 3_600_000));
+  });
+
+  it('gives a different sequence on the next UTC day', () => {
+    expect(play('u1', DAY1)).not.toEqual(play('u1', DAY1 + 24 * 3_600_000));
+  });
+});
+
 describe('endless rounds', () => {
   it('keeps a correct player going past round 10 on a grid that fits every lit cell', () => {
     let game = newGame('u1', T0);

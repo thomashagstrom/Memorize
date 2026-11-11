@@ -9,7 +9,7 @@ export type RemoteGame = {
 };
 
 /** A game played against the server's API, signed in with the player's ID token. */
-export function createRemoteGame(getToken: () => Promise<string>): RemoteGame {
+export function createRemoteGame(getToken: () => Promise<string>, daily = false): RemoteGame {
   let gameId = '';
   let round = 0;
 
@@ -27,6 +27,7 @@ export function createRemoteGame(getToken: () => Promise<string>): RemoteGame {
     async start() {
       const game = await post<{ gameId: string; round: number; targets: number[] }>(
         '/api/game/start',
+        { daily },
       );
       gameId = game.gameId;
       round = game.round;

@@ -23,6 +23,7 @@ export default function GameShell() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [best, setBest] = useState<{ uid: string; value: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [daily, setDaily] = useState(false);
 
   useEffect(() => onAuthStateChanged(getFirebase().auth, setUser), []);
 
@@ -55,7 +56,7 @@ export default function GameShell() {
   // scores the answers. Guests play locally and nothing is saved.
   const remote = useMemo<RemoteGame | undefined>(() => {
     if (!user) return undefined;
-    const game = createRemoteGame(() => user.getIdToken());
+    const game = createRemoteGame(() => user.getIdToken(), daily);
     return {
       async start() {
         try {
@@ -78,7 +79,7 @@ export default function GameShell() {
         }
       },
     };
-  }, [user]);
+  }, [user, daily]);
 
   return (
     <>
@@ -109,7 +110,21 @@ export default function GameShell() {
         )}
       </header>
       {error ? <p role="alert" className="text-center">{error}</p> : null}
-      <GridFlash remote={remote} />
+      {user ? (
+        <div className="flex justify-center gap-2">
+          {[false, true].map((d) => (
+            <button
+              key={String(d)}
+              aria-pressed={daily === d}
+              className={`rounded border px-3 py-1 ${daily === d ? 'bg-blue-700 text-white' : ''}`}
+              onClick={() => setDaily(d)}
+            >
+              {d ? 'Daily challenge' : 'Free play'}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <GridFlash key={String(daily)} remote={remote} />
     </>
   );
 }
