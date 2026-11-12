@@ -1,4 +1,5 @@
 import { answerRound, verifyPlayer } from '@/lib/gameServer';
+import { routeError } from '@/lib/route-errors';
 
 /** Scores the taps a signed-in player made in one round. The browser never sends a score. */
 export async function POST(request: Request) {
@@ -19,8 +20,12 @@ export async function POST(request: Request) {
     return Response.json({ error: 'bad request' }, { status: 400 });
   }
 
-  const result = await answerRound(player, body.gameId, body.round, body.taps as number[]);
-  // A rejected result says nothing about why.
-  if (result.kind === 'rejected') return Response.json({ error: 'rejected' }, { status: 422 });
-  return Response.json(result);
+  try {
+    const result = await answerRound(player, body.gameId, body.round, body.taps as number[]);
+    // A rejected result says nothing about why.
+    if (result.kind === 'rejected') return Response.json({ error: 'rejected' }, { status: 422 });
+    return Response.json(result);
+  } catch (error) {
+    return routeError('POST /api/game/answer', error);
+  }
 }
