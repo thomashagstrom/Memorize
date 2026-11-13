@@ -1,3 +1,16 @@
+import { describeRouteError } from '@/lib/route-errors';
+
+/** A failed request, carrying the plain sentence to show the player. */
+export class RequestError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'RequestError';
+  }
+}
+
 /** What the game needs from the server: it issues each round and scores the answers. */
 export type RemoteGame = {
   /** Starts a game and resolves to the first round's pattern. */
@@ -14,12 +27,20 @@ export function createRemoteGame(getToken: () => Promise<string>, daily = false)
   let round = 0;
 
   async function post<T>(path: string, body?: unknown): Promise<T> {
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    let res: Response;
+    try {
+      res = await fetch(path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await getToken()}`, 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch {
+      throw new RequestError(describeRouteError());
+    }
+    if (!res.ok) {
+      const detail = (await res.json().catch(() => null)) as { step?: string; ref?: string } | null;
+      throw new RequestError(describeRouteError(res.status, detail), res.status);
+    }
     return (await res.json()) as T;
   }
 

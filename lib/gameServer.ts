@@ -6,6 +6,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 import { nextBest } from '@/lib/bestScore';
 import { utcDay } from '@/lib/gridFlash';
+import { StepError } from '@/lib/route-errors';
 import { newGame, submitAnswer, type Game } from '@/lib/gameSession';
 
 /**
@@ -15,14 +16,23 @@ import { newGame, submitAnswer, type Game } from '@/lib/gameSession';
  */
 function admin() {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId && process.env.NODE_ENV === 'production') {
+    console.error('[gameServer] Missing required configuration: NEXT_PUBLIC_FIREBASE_PROJECT_ID');
+    throw new StepError('config', new Error('Missing NEXT_PUBLIC_FIREBASE_PROJECT_ID'));
+  }
   if (!projectId) {
     process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
     process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8081';
   }
-  const app =
-    getApps().length > 0
-      ? getApp()
-      : initializeApp({ projectId: projectId ?? 'demo-app', credential: applicationDefault() });
+  let app;
+  try {
+    app =
+      getApps().length > 0
+        ? getApp()
+        : initializeApp({ projectId: projectId ?? 'demo-app', credential: applicationDefault() });
+  } catch (e) {
+    throw new StepError('config', e);
+  }
   return { auth: getAuth(app), db: getFirestore(app) };
 }
 
@@ -32,8 +42,9 @@ export type Player = { uid: string; displayName: string };
 export async function verifyPlayer(request: Request): Promise<Player | null> {
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
   if (!token) return null;
+  const { auth } = admin(); // a configuration failure throws, so the route can report it
   try {
-    const decoded = await admin().auth.verifyIdToken(token);
+    const decoded = await auth.verifyIdToken(token);
     return { uid: decoded.uid, displayName: decoded.name ?? decoded.email ?? 'Player' };
   } catch {
     return null;
@@ -52,16 +63,24 @@ export async function startGame(player: Player, daily = false) {
   let game: Game;
   if (daily) {
     const attemptRef = db.collection('dailyScores').doc(`${utcDay(now)}_${player.uid}`);
-    game = await db.runTransaction(async (tx) => {
-      const counted = !(await tx.get(attemptRef)).exists;
-      // The attempt has no score yet, so it stays off the leaderboard until the game ends.
-      if (counted) tx.set(attemptRef, { day: utcDay(now), uid: player.uid, displayName: player.displayName });
-      return newGame(player.uid, now, undefined, { counted });
-    });
+    try {
+      game = await db.runTransaction(async (tx) => {
+        const counted = !(await tx.get(attemptRef)).exists;
+        // The attempt has no score yet, so it stays off the leaderboard until the game ends.
+        if (counted) tx.set(attemptRef, { day: utcDay(now), uid: player.uid, displayName: player.displayName });
+        return newGame(player.uid, now, undefined, { counted });
+      });
+    } catch (e) {
+      throw new StepError('daily_attempt', e);
+    }
   } else {
     game = newGame(player.uid, now);
   }
-  await db.collection('games').doc(gameId).set(game);
+  try {
+    await db.collection('games').doc(gameId).set(game);
+  } catch (e) {
+    throw new StepError('save_game', e);
+  }
   return { gameId, round: game.level, targets: game.targets, counted: game.counted };
 }
 

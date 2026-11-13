@@ -64,7 +64,12 @@ export default function GameShell() {
           setError(null);
           return targets;
         } catch (e) {
-          setError('Could not start the game. Please try again.');
+          console.error('Could not start the game:', (e as { status?: number }).status ?? 'no response');
+          setError(
+            e instanceof Error && e.name === 'RequestError'
+              ? e.message
+              : 'Could not start the game. Please try again.',
+          );
           throw e;
         }
       },
