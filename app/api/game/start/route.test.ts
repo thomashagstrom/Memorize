@@ -40,6 +40,39 @@ describe('POST /api/game/start', () => {
     spy.mockRestore();
   });
 
+  it.each(['config', 'daily_attempt', 'save_game'])(
+    'logs the %s step with a reference ID and returns the same ID and step to the browser',
+    async (step) => {
+      const { StepError } = await import('@/lib/route-errors');
+      verifyPlayer.mockResolvedValue(player);
+      startGame.mockRejectedValue(new StepError(step, new Error('boom')));
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { POST } = await import('./route');
+
+      const res = await POST(request());
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body).toMatchObject({ error: 'server_error', step });
+      expect(body.ref).toMatch(/^[0-9a-f]{8}$/);
+      expect(spy.mock.calls[0][0]).toContain(`ref=${body.ref} step=${step}`);
+      spy.mockRestore();
+    },
+  );
+
+  it('reports a failure while checking the player (not a silent 401)', async () => {
+    const { StepError } = await import('@/lib/route-errors');
+    verifyPlayer.mockRejectedValue(new StepError('config', new Error('no project')));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { POST } = await import('./route');
+
+    const res = await POST(request());
+
+    expect(res.status).toBe(500);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
   it('starts a free play game for a player with no profile or best score yet', async () => {
     verifyPlayer.mockResolvedValue(player);
     startGame.mockResolvedValue({ gameId: 'g2', round: 1, targets: [0, 4, 8], counted: undefined });

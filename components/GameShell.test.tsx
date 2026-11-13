@@ -114,6 +114,22 @@ describe('Sign in with Google', () => {
     expect(screen.queryAllByRole('button', { name: /^Cell / })).toHaveLength(0);
   });
 
+  it('shows the specific reason and reference ID when the start request fails', async () => {
+    const failure = new Error('Your session has expired, please sign in again. (Reference: ab12cd34)');
+    failure.name = 'RequestError';
+    h.start.mockRejectedValue(failure);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<GameShell />);
+    act(() => h.listener!(player));
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await vi.waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe(
+        'Your session has expired, please sign in again. (Reference: ab12cd34)',
+      ),
+    );
+    spy.mockRestore();
+  });
+
   it('lets a signed-out player play without saving anything', async () => {
     render(<GameShell />);
     act(() => h.listener!(null));
