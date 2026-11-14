@@ -50,7 +50,7 @@ describe('Sign in with Google', () => {
     vi.useFakeTimers();
     h.listener = null;
     h.loadBest.mockResolvedValue(5);
-    h.start.mockResolvedValue([0, 1]);
+    h.start.mockResolvedValue({ targets: [0, 1], colours: [] });
   });
   afterEach(() => {
     cleanup();

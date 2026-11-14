@@ -1,3 +1,4 @@
+import type { Pattern } from '@/lib/gridFlash';
 import { describeRouteError } from '@/lib/route-errors';
 
 /** A failed request, carrying the plain sentence to show the player. */
@@ -14,11 +15,12 @@ export class RequestError extends Error {
 /** What the game needs from the server: it issues each round and scores the answers. */
 export type RemoteGame = {
   /** Starts a game and resolves to the first round's pattern. */
-  start(): Promise<number[]>;
-  /** Sends the taps made in the current round. Rejects when the server refuses them. */
-  answer(taps: number[]): Promise<
-    { kind: 'continue'; targets: number[] } | { kind: 'over'; best: number }
-  >;
+  start(): Promise<Pattern>;
+  /** Sends the taps (and their colours, in a colour round) made in the current round. Rejects when the server refuses them. */
+  answer(
+    taps: number[],
+    colours?: number[],
+  ): Promise<({ kind: 'continue' } & Pattern) | { kind: 'over'; best: number }>;
 };
 
 /** A game played against the server's API, signed in with the player's ID token. */
@@ -46,21 +48,21 @@ export function createRemoteGame(getToken: () => Promise<string>, daily = false)
 
   return {
     async start() {
-      const game = await post<{ gameId: string; round: number; targets: number[] }>(
+      const game = await post<{ gameId: string; round: number } & Partial<Pattern> & { targets: number[] }>(
         '/api/game/start',
         { daily },
       );
       gameId = game.gameId;
       round = game.round;
-      return game.targets;
+      return { targets: game.targets, colours: game.colours ?? [] };
     },
-    async answer(taps) {
+    async answer(taps, colours) {
       const result = await post<
-        { kind: 'continue'; round: number; targets: number[] } | { kind: 'over'; best: number }
-      >('/api/game/answer', { gameId, round, taps });
+        ({ kind: 'continue'; round: number } & Pattern) | { kind: 'over'; best: number }
+      >('/api/game/answer', { gameId, round, taps, ...(colours?.length ? { colours } : {}) });
       if (result.kind === 'continue') {
         round = result.round;
-        return { kind: 'continue', targets: result.targets };
+        return { kind: 'continue', targets: result.targets, colours: result.colours ?? [] };
       }
       return { kind: 'over', best: result.best };
     },

@@ -60,9 +60,9 @@ export default function GameShell() {
     return {
       async start() {
         try {
-          const targets = await game.start();
+          const pattern = await game.start();
           setError(null);
-          return targets;
+          return pattern;
         } catch (e) {
           console.error('Could not start the game:', (e as { status?: number }).status ?? 'no response');
           setError(
@@ -73,9 +73,9 @@ export default function GameShell() {
           throw e;
         }
       },
-      async answer(taps) {
+      async answer(taps, colours) {
         try {
-          const result = await game.answer(taps);
+          const result = await (colours ? game.answer(taps, colours) : game.answer(taps));
           if (result.kind === 'over') setBest({ uid: user.uid, value: result.best });
           return result;
         } catch (e) {
