@@ -10,18 +10,20 @@ export async function POST(request: Request) {
     gameId?: unknown;
     round?: unknown;
     taps?: unknown;
+    colours?: unknown;
   } | null;
   if (
     typeof body?.gameId !== 'string' ||
     typeof body.round !== 'number' ||
     !Array.isArray(body.taps) ||
-    body.taps.length > 100
+    body.taps.length > 100 ||
+    (body.colours !== undefined && (!Array.isArray(body.colours) || body.colours.length > 100))
   ) {
     return Response.json({ error: 'bad request' }, { status: 400 });
   }
 
   try {
-    const result = await answerRound(player, body.gameId, body.round, body.taps as number[]);
+    const result = await answerRound(player, body.gameId, body.round, body.taps as number[], body.colours as number[] | undefined);
     // A rejected result says nothing about why.
     if (result.kind === 'rejected') return Response.json({ error: 'rejected' }, { status: 422 });
     return Response.json(result);

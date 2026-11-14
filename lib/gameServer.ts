@@ -81,11 +81,11 @@ export async function startGame(player: Player, daily = false) {
   } catch (e) {
     throw new StepError('save_game', e);
   }
-  return { gameId, round: game.level, targets: game.targets, counted: game.counted };
+  return { gameId, round: game.level, targets: game.targets, colours: game.colours, counted: game.counted };
 }
 
 export type AnswerResponse =
-  | { kind: 'continue'; round: number; targets: number[] }
+  | { kind: 'continue'; round: number; targets: number[]; colours: number[] }
   | { kind: 'over'; score: number; best: number }
   | { kind: 'rejected' };
 
@@ -98,6 +98,7 @@ export async function answerRound(
   gameId: string,
   round: number,
   taps: number[],
+  colours: number[] = [],
 ): Promise<AnswerResponse> {
   const { db } = admin();
   const gameRef = db.collection('games').doc(gameId);
@@ -107,14 +108,14 @@ export async function answerRound(
     const [gameSnap, profileSnap] = await Promise.all([tx.get(gameRef), tx.get(profileRef)]);
     const stored = gameSnap.data() as Game | undefined;
     if (!stored || stored.uid !== player.uid) return { kind: 'rejected' };
-    const outcome = submitAnswer(stored, round, taps, Date.now());
+    const outcome = submitAnswer(stored, round, taps, Date.now(), undefined, colours);
     if (outcome.kind === 'rejected') {
       if (outcome.game !== stored) tx.set(gameRef, outcome.game);
       return { kind: 'rejected' };
     }
     tx.set(gameRef, outcome.game);
     if (outcome.kind === 'continue') {
-      return { kind: 'continue', round: outcome.game.level, targets: outcome.game.targets };
+      return { kind: 'continue', round: outcome.game.level, targets: outcome.game.targets, colours: outcome.game.colours };
     }
     const best = nextBest(profileSnap.data()?.bestScore as number | undefined, outcome.game.score);
     tx.set(profileRef, { bestScore: best, displayName: player.displayName });

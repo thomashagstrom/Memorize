@@ -6,12 +6,45 @@ export type Round = {
   targets: number[];
   /** Cells the player has tapped so far. */
   taps: number[];
+  /** Colour of each lit cell, parallel to `targets`; empty in a single-colour round. */
+  colours?: number[];
+  /** Colour the player gave each tapped cell, parallel to `taps`. */
+  tapColours?: number[];
 };
 
 export type TapResult =
   | { kind: 'continue'; round: Round }
   | { kind: 'complete' }
   | { kind: 'wrong' };
+
+/** The first round whose lit cells come in different colours; earlier rounds are single-colour. */
+export const COLOUR_START_LEVEL = 4;
+
+/** The colours a lit cell can have from the colour starting level on; each has a glyph so colour is never the only cue. */
+export const COLOURS = [
+  { name: 'Red', glyph: '●', className: 'bg-red-600 text-white' },
+  { name: 'Blue', glyph: '■', className: 'bg-blue-700 text-white' },
+  { name: 'Green', glyph: '▲', className: 'bg-green-700 text-white' },
+  { name: 'Yellow', glyph: '◆', className: 'bg-yellow-300 text-black' },
+] as const;
+
+/** What a round shows: the lit cells and, parallel to them, each one's colour (an index into COLOURS; empty below the colour starting level). */
+export type Pattern = { targets: number[]; colours: number[] };
+
+/** Whether lit cells have colours in a round. */
+export const hasColours = (round: number) => round >= COLOUR_START_LEVEL;
+
+/** Picks a colour for each of `count` cells. */
+export function pickColours(count: number, random: () => number = Math.random): number[] {
+  return Array.from({ length: count }, () => Math.floor(random() * COLOURS.length));
+}
+
+/** The pattern of a round: cells first, then colours from the same random function, so a round's cells never depend on colours. */
+export function patternForRound(round: number, random?: () => number): Pattern {
+  const rand = random ?? Math.random;
+  const targets = pickCells(cellsForRound(round), gridSizeForRound(round), rand);
+  return { targets, colours: hasColours(round) ? pickColours(targets.length, rand) : [] };
+}
 
 /** Picks `count` distinct cells out of a `size` × `size` grid. */
 export function pickCells(count: number, size: number, random: () => number = Math.random): number[] {
@@ -72,13 +105,15 @@ export function gridSizeForRound(round: number): number {
 }
 
 export function startRound(round: number, random?: () => number): Round {
-  return { targets: pickCells(cellsForRound(round), gridSizeForRound(round), random), taps: [] };
+  return { ...patternForRound(round, random), taps: [], tapColours: [] };
 }
 
-/** Applies a tap: a lit cell not yet tapped is right, anything else ends the game. */
-export function tapCell(round: Round, cell: number): TapResult {
-  if (!round.targets.includes(cell) || round.taps.includes(cell)) return { kind: 'wrong' };
+/** Applies a tap: a lit cell not yet tapped, in the right colour when the round has colours, is right; anything else ends the game. */
+export function tapCell(round: Round, cell: number, colour?: number): TapResult {
+  const at = round.targets.indexOf(cell);
+  if (at < 0 || round.taps.includes(cell)) return { kind: 'wrong' };
+  if (round.colours?.length && round.colours[at] !== colour) return { kind: 'wrong' };
   const taps = [...round.taps, cell];
   if (taps.length === round.targets.length) return { kind: 'complete' };
-  return { kind: 'continue', round: { ...round, taps } };
+  return { kind: 'continue', round: { ...round, taps, tapColours: [...(round.tapColours ?? []), colour ?? 0] } };
 }

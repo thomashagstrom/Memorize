@@ -3,7 +3,16 @@
 import { useEffect, useState } from 'react';
 
 import type { RemoteGame } from '@/lib/gameClient';
-import { gridSizeForRound, startRound, tapCell, viewMsForCells, type Round } from '@/lib/gridFlash';
+import {
+  COLOURS,
+  gridSizeForRound,
+  patternForRound,
+  startRound,
+  tapCell,
+  viewMsForCells,
+  type Pattern,
+  type Round,
+} from '@/lib/gridFlash';
 
 type Phase = 'idle' | 'loading' | 'showing' | 'input' | 'over';
 
@@ -22,6 +31,8 @@ export default function GridFlash({
   // The first round is drawn on Play, not while rendering, so prerender and hydration agree.
   const [round, setRound] = useState<Round>({ targets: [], taps: [] });
   const [phase, setPhase] = useState<Phase>('idle');
+  // The colour the next tapped cell gets in a colour round.
+  const [colour, setColour] = useState(0);
 
   useEffect(() => {
     if (phase !== 'showing') return;
@@ -34,28 +45,29 @@ export default function GridFlash({
     onGameOver?.(level - 1);
   }
 
-  function nextRound(targets: number[]) {
+  function nextRound(pattern: Pattern) {
     setLevel(level + 1);
-    setRound({ targets, taps: [] });
+    setColour(0);
+    setRound({ ...pattern, taps: [], tapColours: [] });
     setPhase('showing');
   }
 
   function onTap(cell: number) {
     if (phase !== 'input') return;
-    const result = tapCell(round, cell);
+    const result = tapCell(round, cell, colour);
     if (result.kind === 'continue') {
       setRound(result.round);
       return;
     }
     if (!remote) {
       if (result.kind === 'wrong') endGame();
-      else nextRound(startRound(level + 1).targets);
+      else nextRound(patternForRound(level + 1));
       return;
     }
     // The server judges the taps and issues the next round, if any.
     setPhase('loading');
-    remote.answer([...round.taps, cell]).then(
-      (reply) => (reply.kind === 'continue' ? nextRound(reply.targets) : endGame()),
+    remote.answer([...round.taps, cell], coloured ? [...(round.tapColours ?? []), colour] : undefined).then(
+      (reply) => (reply.kind === 'continue' ? nextRound(reply) : endGame()),
       endGame,
     );
   }
@@ -69,13 +81,16 @@ export default function GridFlash({
     }
     setPhase('loading');
     remote.start().then(
-      (targets) => {
-        setRound({ targets, taps: [] });
+      (pattern) => {
+        setColour(0);
+        setRound({ ...pattern, taps: [], tapColours: [] });
         setPhase('showing');
       },
       () => setPhase('idle'),
     );
   }
+
+  const coloured = (round.colours?.length ?? 0) > 0;
 
   // Score is the number of rounds completed.
   const score = level - 1;
@@ -129,6 +144,13 @@ export default function GridFlash({
           const lit =
             (phase === 'showing' && round.targets.includes(cell)) ||
             (phase === 'input' && round.taps.includes(cell));
+          const shownColour =
+            coloured && lit
+              ? phase === 'showing'
+                ? round.colours?.[round.targets.indexOf(cell)]
+                : round.tapColours?.[round.taps.indexOf(cell)]
+              : undefined;
+          const shown = shownColour === undefined ? undefined : COLOURS[shownColour];
           return (
             <button
               key={cell}
@@ -137,12 +159,31 @@ export default function GridFlash({
               disabled={phase !== 'input'}
               onClick={() => onTap(cell)}
               className={`aspect-square w-full rounded border-2 border-blue-900 ${
-                lit ? 'bg-yellow-300' : 'bg-slate-200'
-              }`}
-            />
+                shown ? shown.className : lit ? 'bg-yellow-300' : 'bg-slate-200'
+              } text-2xl font-bold`}
+            >
+              {shown?.glyph}
+            </button>
           );
         })}
       </div>
+      {coloured && phase === 'input' && (
+        <div role="radiogroup" aria-label="Colour" className="flex flex-wrap justify-center gap-2">
+          {COLOURS.map((c, i) => (
+            <button
+              key={c.name}
+              role="radio"
+              aria-checked={colour === i}
+              onClick={() => setColour(i)}
+              className={`min-h-12 min-w-12 rounded px-3 ${c.className} ${
+                colour === i ? 'ring-4 ring-slate-900 ring-offset-2' : ''
+              }`}
+            >
+              {c.glyph} {c.name}
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

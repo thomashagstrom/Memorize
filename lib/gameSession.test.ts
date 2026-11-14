@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { gridSizeForRound } from './gridFlash';
+import { COLOUR_START_LEVEL, COLOURS, gridSizeForRound, patternForRound } from './gridFlash';
 import { MIN_TAP_MS, MIN_VIEW_MS, newGame, submitAnswer } from './gameSession';
 
 const T0 = 1_000_000;
@@ -19,16 +19,73 @@ describe('server-issued rounds', () => {
   });
 });
 
+describe('colour levels', () => {
+  /** A game at `level`, as if the earlier rounds were won. */
+  const at = (level: number) => ({ ...newGame('u1', T0), ...patternForRound(level), level });
+
+  it('keeps patterns single-colour below the colour starting level', () => {
+    const game = at(COLOUR_START_LEVEL - 1);
+    expect(game.colours).toEqual([]);
+    const outcome = submitAnswer(game, game.level, [...game.targets], slow(game.targets.length));
+    expect(outcome.kind).toBe('continue');
+  });
+
+  it('gives each lit square a colour from the colour starting level onwards', () => {
+    const game = at(COLOUR_START_LEVEL);
+    expect(game.colours).toHaveLength(game.targets.length);
+    expect(game.colours.every((c) => c >= 0 && c < COLOURS.length)).toBe(true);
+  });
+
+  it('marks a right-position, wrong-colour answer wrong', () => {
+    const game = at(COLOUR_START_LEVEL);
+    const colours = [...game.colours];
+    colours[colours.length - 1] = (colours[colours.length - 1] + 1) % COLOURS.length;
+    const outcome = submitAnswer(game, game.level, [...game.targets], slow(game.targets.length), undefined, colours);
+    expect(outcome.kind).toBe('over');
+    expect(outcome.game.score).toBe(game.score);
+  });
+
+  it('continues when position and colour both match', () => {
+    const game = at(COLOUR_START_LEVEL);
+    const outcome = submitAnswer(game, game.level, [...game.targets], slow(game.targets.length), undefined, [
+      ...game.colours,
+    ]);
+    expect(outcome.kind).toBe('continue');
+    expect(outcome.game.score).toBe(1);
+  });
+
+  it('rejects an answer that sends no colours in a colour round', () => {
+    const game = at(COLOUR_START_LEVEL);
+    const outcome = submitAnswer(game, game.level, [...game.targets], slow(game.targets.length));
+    expect(outcome.kind).toBe('rejected');
+  });
+
+  it('gives two daily players identical coloured patterns for the same level', () => {
+    const day = Date.UTC(2026, 0, 5, 3);
+    let a = newGame('u1', day, undefined, { counted: true });
+    let b = newGame('u2', day + 3_600_000, undefined, { counted: true });
+    for (let round = 1; round < COLOUR_START_LEVEL; round++) {
+      const now = day + 7_200_000 + round * 100_000;
+      a = submitAnswer(a, round, [...a.targets], now, undefined, [...a.colours]).game;
+      b = submitAnswer(b, round, [...b.targets], now, undefined, [...b.colours]).game;
+    }
+    expect(a.level).toBe(COLOUR_START_LEVEL);
+    expect(a.colours.length).toBeGreaterThan(0);
+    expect(b.targets).toEqual(a.targets);
+    expect(b.colours).toEqual(a.colours);
+  });
+});
+
 describe('daily challenge patterns', () => {
   const DAY1 = Date.UTC(2026, 0, 5, 3);
   const play = (uid: string, start: number) => {
     let game = newGame(uid, start, undefined, { counted: true });
-    const seen = [game.targets];
+    const seen = [[game.targets, game.colours]];
     let now = start;
     for (let round = 1; round <= 6; round++) {
       now += MIN_VIEW_MS + MIN_TAP_MS * game.targets.length + 1;
-      game = submitAnswer(game, round, [...game.targets], now).game;
-      seen.push(game.targets);
+      game = submitAnswer(game, round, [...game.targets], now, undefined, [...game.colours]).game;
+      seen.push([game.targets, game.colours]);
     }
     return seen;
   };
@@ -49,7 +106,7 @@ describe('endless rounds', () => {
     for (let round = 1; round <= 15; round++) {
       const previous = game.targets;
       now += MIN_VIEW_MS + MIN_TAP_MS * previous.length + 1;
-      const outcome = submitAnswer(game, round, [...previous], now);
+      const outcome = submitAnswer(game, round, [...previous], now, undefined, [...game.colours]);
       expect(outcome.kind).toBe('continue');
       game = outcome.game;
       expect(game.targets).not.toEqual(previous);
@@ -67,12 +124,12 @@ describe('server-computed score', () => {
     let now = T0;
     for (let round = 1; round <= 3; round++) {
       now = slow(game.targets.length) - T0 + now;
-      const outcome = submitAnswer(game, round, [...game.targets], now);
+      const outcome = submitAnswer(game, round, [...game.targets], now, undefined, [...game.colours]);
       expect(outcome.kind).toBe('continue');
       game = outcome.game;
     }
     const wrong = [0, 1, 2, 3, 4, 5, 6, 7, 8].find((c) => !game.targets.includes(c))!;
-    const end = submitAnswer(game, 4, [wrong], now + MIN_VIEW_MS + MIN_TAP_MS + 1);
+    const end = submitAnswer(game, 4, [wrong], now + MIN_VIEW_MS + MIN_TAP_MS + 1, undefined, [0]);
     expect(end.kind).toBe('over');
     expect(end.game.score).toBe(3);
     expect(end.game.voided).toBe(false);

@@ -1,4 +1,4 @@
-import { cellsForRound, gridSizeForRound, pickCells, seededRandom, utcDay } from '@/lib/gridFlash';
+import { COLOURS, patternForRound, seededRandom, utcDay } from '@/lib/gridFlash';
 
 /** Time the player is shown the pattern before they can answer. */
 export const MIN_VIEW_MS = 1200;
@@ -11,6 +11,8 @@ export type Game = {
   /** The round in play, starting at 1. */
   level: number;
   targets: number[];
+  /** Colour of each target, parallel to `targets`; empty below the colour starting level. */
+  colours: number[];
   /** When the server issued the current round, in epoch milliseconds. */
   issuedAt: number;
   /** Rounds completed so far; this is the score. */
@@ -45,7 +47,7 @@ export function newGame(
   return {
     uid,
     level: 1,
-    targets: pickCells(cellsForRound(1), gridSizeForRound(1), randomFor(day, 1, random)),
+    ...patternForRound(1, randomFor(day, 1, random)),
     issuedAt: now,
     score: 0,
     over: false,
@@ -67,6 +69,7 @@ export function submitAnswer(
   taps: number[],
   now: number,
   random?: () => number,
+  colours: number[] = [],
 ): Outcome {
   // A game that already ended is left exactly as it was, so a repeat changes nothing.
   if (game.over) return { kind: 'rejected', game };
@@ -74,9 +77,16 @@ export function submitAnswer(
   if (taps.length === 0 || !taps.every((t) => Number.isInteger(t))) return reject(game);
   if (now - game.issuedAt < MIN_VIEW_MS + MIN_TAP_MS * taps.length) return reject(game);
 
+  // In a colour round every tap names one of the colours.
+  const coloured = (game.colours ?? []).length > 0;
+  const validColours =
+    colours.length === taps.length && colours.every((c) => Number.isInteger(c) && c >= 0 && c < COLOURS.length);
+  if (coloured && !validColours) return reject(game);
+
   const seen: number[] = [];
   for (const [i, cell] of taps.entries()) {
-    if (!game.targets.includes(cell) || seen.includes(cell)) {
+    const at = game.targets.indexOf(cell);
+    if (at < 0 || seen.includes(cell) || (coloured && game.colours[at] !== colours[i])) {
       // A wrong tap is the player's last one.
       if (i !== taps.length - 1) return reject(game);
       return { kind: 'over', game: { ...game, over: true } };
@@ -91,7 +101,7 @@ export function submitAnswer(
     ...game,
     level,
     score: game.score + 1,
-    targets: pickCells(cellsForRound(level), gridSizeForRound(level), randomFor(game.day, level, random)),
+    ...patternForRound(level, randomFor(game.day, level, random)),
     issuedAt: now,
   };
   return { kind: 'continue', game: next };

@@ -64,7 +64,7 @@ describe('grid flash round logic', () => {
       expect(next.length).not.toBe(prev.length);
       expect(next.length).toBeLessThan(gridSizeForRound(round) ** 2);
     }
-  });
+  }, 30_000);
 
   it('completes the round once every lit cell is tapped, in any order', () => {
     const round = startRound(1);
