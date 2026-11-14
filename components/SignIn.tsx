@@ -43,6 +43,7 @@ export default function SignIn() {
     try {
       await action();
     } catch (e) {
+      console.log('SignIn error', e);
       setError(friendlyError(e));
     } finally {
       setBusy(false);
